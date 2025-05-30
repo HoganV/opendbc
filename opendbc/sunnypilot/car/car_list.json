@@ -840,7 +840,19 @@
       "2022"
     ],
     "package": "All"
-  },
+    },
+    "Honda Accord 2023+": {
+    "platform": "HONDA_ACCORD_11G",
+    "make": "Honda",
+    "brand": "honda",
+    "model": "Accord",
+    "year": [
+      "2023",
+      "2024",
+      "2025"
+    ],
+    "package": "All"
+  }
   "Honda Civic 2016-18": {
     "platform": "HONDA_CIVIC",
     "make": "Honda",
