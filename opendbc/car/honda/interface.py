@@ -37,27 +37,29 @@ class CarInterface(CarInterfaceBase):
     CAN = CanBus(ret, fingerprint)
 
     # Recent test route is needed to undashcam these cars
-    ret.dashcamOnly = candidate in HONDA_BOSCH_CANFD
+    #ret.dashcamOnly = candidate in HONDA_BOSCH_CANFD
 
     if candidate in HONDA_BOSCH:
+      # Set the standard Bosch safety model
       cfgs = [get_safety_config(structs.CarParams.SafetyModel.hondaBosch)]
-      if candidate in HONDA_BOSCH_CANFD and CAN.pt >= 4:
-        cfgs.insert(0, get_safety_config(structs.CarParams.SafetyModel.noOutput))
-      ret.safetyConfigs = cfgs
 
+      # REMOVE noOutput override so we can send CAN messages
+      # (if you still want to block CAN for testing, uncomment this)
+      # if candidate in HONDA_BOSCH_CANFD and CAN.pt >= 4:
+      #   cfgs.insert(0, get_safety_config(structs.CarParams.SafetyModel.noOutput))
+
+      ret.safetyConfigs = cfgs
       ret.radarUnavailable = True
-      # Disable the radar and let openpilot control longitudinal
-      # WARNING: THIS DISABLES AEB!
-      # If Bosch radarless, this blocks ACC messages from the camera
-      # TODO: get radar disable working on Bosch CANFD
-      ret.alphaLongitudinalAvailable = candidate not in HONDA_BOSCH_CANFD
-      ret.openpilotLongitudinalControl = alpha_long
-      ret.pcmCruise = not ret.openpilotLongitudinalControl
+
+      # ENABLE OpenPilot longitudinal for all Bosch cars
+      ret.alphaLongitudinalAvailable = True
+      ret.openpilotLongitudinalControl = True
+      ret.pcmCruise = False
     else:
       ret.safetyConfigs = [get_safety_config(structs.CarParams.SafetyModel.hondaNidec)]
       ret.openpilotLongitudinalControl = True
-
       ret.pcmCruise = True
+
 
     if candidate == CAR.HONDA_CRV_5G:
       ret.enableBsm = 0x12f8bfa7 in fingerprint[CAN.radar]
@@ -74,6 +76,9 @@ class CarInterface(CarInterfaceBase):
       ret.transmissionType = TransmissionType.manual
     # New Civics don't have 0x191, but do have 0x1A3
     elif candidate == CAR.HONDA_CIVIC_2022 and 0x1A3 in fingerprint[CAN.pt]:
+      ret.transmissionType = TransmissionType.cvt
+    # 11G Accord
+    elif candidate == CAR.HONDA_ACCORD_11G and 0x1A3 not in fingerprint[CAN.pt]:
       ret.transmissionType = TransmissionType.cvt
 
     # Certain Hondas have an extra steering sensor at the bottom of the steering rack,
@@ -120,6 +125,10 @@ class CarInterface(CarInterfaceBase):
       ret.lateralParams.torqueBP, ret.lateralParams.torqueV = [[0, 4096], [0, 4096]]  # TODO: determine if there is a dead zone at the top end
       ret.lateralTuning.pid.kpBP, ret.lateralTuning.pid.kpV = [[0, 10], [0.05, 0.5]]
       ret.lateralTuning.pid.kiBP, ret.lateralTuning.pid.kiV = [[0, 10], [0.0125, 0.125]]
+    
+    elif candidate == CAR.HONDA_ACCORD_11G:
+      ret.lateralParams.torqueBP, ret.lateralParams.torqueV = [[0, 4096], [0, 4096]]
+      ret.lateralTuning.pid.kpV, ret.lateralTuning.pid.kiV = [[0.2], [0.18]]
 
     elif candidate == CAR.HONDA_ACCORD:
       ret.lateralParams.torqueBP, ret.lateralParams.torqueV = [[0, 4096], [0, 4096]]  # TODO: determine if there is a dead zone at the top end
@@ -220,7 +229,7 @@ class CarInterface(CarInterfaceBase):
     if ret.openpilotLongitudinalControl and candidate in HONDA_BOSCH:
       ret.safetyConfigs[-1].safetyParam |= HondaSafetyFlags.BOSCH_LONG.value
 
-    if candidate in HONDA_BOSCH_RADARLESS:
+    if candidate in (HONDA_BOSCH_RADARLESS|HONDA_BOSCH_CANFD):
       ret.safetyConfigs[-1].safetyParam |= HondaSafetyFlags.RADARLESS.value
 
     # min speed to enable ACC. if car can do stop and go, then set enabling speed
